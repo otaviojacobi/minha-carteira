@@ -5,13 +5,28 @@ Description: >
 
   Sample SAM Template for minha-carteira
 
+
+Parameters:
+  LogLevel:
+    Type: String
+    Description: Application log level
+    Default: INFO
+    AllowedValues:
+      - DEBUG
+      - INFO
+      - WARNING
+      - ERROR
+      - CRITICAL
+
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
-    Timeout: 3
+    Timeout: 10
+    Environment:
+      Variables:
+        LOG_LEVEL: !Ref LogLevel
 
 Resources:
-
   MinhaCarteiraApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -25,8 +40,52 @@ Resources:
           description: "Minha Carteira API"
           version: "1.0.0"
           title: "Minha Carteira API"
-        basePath: "/v1"
         paths:
+          /price:
+            post:
+              consumes:
+              - "application/json"
+              produces:
+              - "application/json"
+              parameters:
+              - in: "body"
+                name: "body"
+                required: true
+                schema:
+                  type: array
+                  items:
+                    type: string
+              responses:
+                "200":
+                  description: "Success"
+                  content:
+                    application/json:
+                      schema:
+                        type: array
+                        items:
+                          $ref: '#/schemas/StockResponse'
+
+                "400":
+                  description: "Bad Request"
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/schemas/ErrorResponse'
+
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StockPriceMultipleFunction.Arn}/invocations"
+
+              x-amazon-apigateway-policy:
+                Version: "2012-10-17"
+                Statement:
+                - Effect: "Allow"
+                  Principal: "*"
+                  Action: "execute-api:Invoke"
+                  Resource: "*"
+
           /price/{stock}/now:
             get:
               produces:
@@ -44,16 +103,16 @@ Resources:
                       schema:
                         $ref: '#/schemas/StockResponse'
                 "400":
-                  description: "Success"
+                  description: "Bad Request"
                   content:
                     application/json:
                       schema:
-                        $ref: '#/schemas/InvalidStockResponse'
+                        $ref: '#/schemas/ErrorResponse'
               x-amazon-apigateway-integration:
-                type: "aws_proxy"
-                httpMethod: "GET"
+                type: aws_proxy
+                httpMethod: POST
                 uri:
-                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StockPriceFunction.Arn}/invocations"
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StockPriceNowFunction.Arn}/invocations"
 
               x-amazon-apigateway-policy:
                 Version: "2012-10-17"
@@ -62,6 +121,7 @@ Resources:
                   Principal: "*"
                   Action: "execute-api:Invoke"
                   Resource: "*"
+        
         schemas:
           StockResponse:
             type: object
@@ -77,7 +137,7 @@ Resources:
               timestamp:
                 type: string
 
-          InvalidStockResponse:
+          ErrorResponse:
             type: object
             required:
               - message
@@ -96,11 +156,54 @@ Resources:
                 }
             ]
 
+# Layers
+  CommonFileLayers:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: CommonFileLayers
+      Description: Python3.8 utility functions -- {common}
+      RetentionPolicy: Delete
+      ContentUri: layers/common-layer/package.zip
+      CompatibleRuntimes:
+        - python3.8
 
-  StockPriceFunction:
+  YahooFinanceLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: YahooFinanceLayer
+      Description: Python3.8 Yahoo Finance Layer -- {yfinance, requests, pandas}
+      RetentionPolicy: Delete
+      ContentUri: layers/yf-layer
+      CompatibleRuntimes:
+        - python3.8
+    Metadata:
+      BuildMethod: python3.8              # Required to have AWS SAM build this layer
+
+# Functions
+  StockPriceMultipleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: stock-price-multiple/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Architectures:
+        - x86_64
+      Events:
+        MultipleStockCurrentPrice:
+          Type: Api
+          Properties:
+            Path: /price
+            Method: post
+            RestApiId:
+              Ref: MinhaCarteiraApi
+      Layers:
+        - !Ref CommonFileLayers
+        - !Ref YahooFinanceLayer
+
+  StockPriceNowFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: stock-price/
+      CodeUri: stock-price-now/
       Handler: app.lambda_handler
       Runtime: python3.8
       Architectures:
@@ -113,17 +216,28 @@ Resources:
             Method: get
             RestApiId:
               Ref: MinhaCarteiraApi
+      Layers:
+        - !Ref CommonFileLayers
+        - !Ref YahooFinanceLayer
 
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # MinhaCarteiraApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   MinhaCarteiraApi:
     Description: "API Gateway endpoint URL for Prod stage for Stock Price function"
-    Value: !Sub "https://${MinhaCarteiraApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  StockPriceFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt StockPriceFunction.Arn
-  StockPriceFunctionIamRole:
+    Value: !Sub "https://${MinhaCarteiraApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+
+  StockPriceNowFunction:
+    Description: "Current stock price Lambda Function ARN"
+    Value: !GetAtt StockPriceNowFunction.Arn
+  StockPriceMultipleFunction:
+    Description: "Multiple stocks prices Lambda Function ARN"
+    Value: !GetAtt StockPriceMultipleFunction.Arn
+
+  StockPriceNowFunctionIamRole:
     Description: "Implicit IAM Role created for Stock Price function"
-    Value: !GetAtt StockPriceFunctionRole.Arn
+    Value: !GetAtt StockPriceNowFunctionRole.Arn
+  StockPriceMultipleFunctionIamRole:
+    Description: "Implicit IAM Role created for Stock Price function"
+    Value: !GetAtt StockPriceMultipleFunctionRole.Arn
