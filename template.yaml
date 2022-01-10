@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  minha-carteira
+
+  Sample SAM Template for minha-carteira
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+
+  MinhaCarteiraApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      # Allows www.example.com to call these APIs
+      # SAM will automatically add AllowMethods with a list of methods for this API
+      Cors: "'*'"
+      DefinitionBody:
+        swagger: "2.0"
+        info:
+          description: "Minha Carteira API"
+          version: "1.0.0"
+          title: "Minha Carteira API"
+        basePath: "/v1"
+        paths:
+          /price/{stock}/now:
+            get:
+              produces:
+              - "application/json"
+              parameters:
+              - name: "stock"
+                in: "path"
+                required: true
+                type: string
+              responses:
+                "200":
+                  description: "Success"
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/schemas/StockResponse'
+                "400":
+                  description: "Success"
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/schemas/InvalidStockResponse'
+              x-amazon-apigateway-integration:
+                type: "aws_proxy"
+                httpMethod: "GET"
+                uri:
+                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StockPriceFunction.Arn}/invocations"
+
+              x-amazon-apigateway-policy:
+                Version: "2012-10-17"
+                Statement:
+                - Effect: "Allow"
+                  Principal: "*"
+                  Action: "execute-api:Invoke"
+                  Resource: "*"
+        schemas:
+          StockResponse:
+            type: object
+            required:
+              - stock
+              - price
+              - timestamp
+            properties:
+              stock:
+                type: string
+              price:
+                type: float
+              timestamp:
+                type: string
+
+          InvalidStockResponse:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                type: string
+      Auth:
+        ResourcePolicy:
+            CustomStatements:
+              [
+                {
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "execute-api:Invoke",
+                    "Resource": "*"
+                }
+            ]
+
+
+  StockPriceFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: stock-price/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Architectures:
+        - x86_64
+      Events:
+        StockCurrentPrice:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /price/{stock}/now
+            Method: get
+            RestApiId:
+              Ref: MinhaCarteiraApi
+
+Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  MinhaCarteiraApi:
+    Description: "API Gateway endpoint URL for Prod stage for Stock Price function"
+    Value: !Sub "https://${MinhaCarteiraApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
+  StockPriceFunction:
+    Description: "Hello World Lambda Function ARN"
+    Value: !GetAtt StockPriceFunction.Arn
+  StockPriceFunctionIamRole:
+    Description: "Implicit IAM Role created for Stock Price function"
+    Value: !GetAtt StockPriceFunctionRole.Arn
