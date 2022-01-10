@@ -8,7 +8,7 @@ from common.stock_response import (MultipleStockPriceResponse,
 
 def lambda_handler(event, _):
 
-    logger = Logger('stock-price').instance()
+    logger = Logger('stock-price-multiple').instance()
     logger.debug(f'Received event: {event}')
 
     request_stocks = json.loads(event['body'])
@@ -24,7 +24,8 @@ def lambda_handler(event, _):
     elif len(request_stocks) == 1:
         stocks_price = [b3.get_current_stock_price(request_stocks[0])]
     else:
-        stocks_price = [b3.get_current_multiple_stock_prices(request_stocks)]
+        stocks_price = b3.get_current_multiple_stock_prices(request_stocks)
 
+    logger.info(stocks_price)
 
     return MultipleStockPriceResponse(stocks_price).json()

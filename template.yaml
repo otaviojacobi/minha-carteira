@@ -31,120 +31,18 @@ Resources:
     Type: AWS::Serverless::Api
     Properties:
       StageName: Prod
-      # Allows www.example.com to call these APIs
-      # SAM will automatically add AllowMethods with a list of methods for this API
       Cors: "'*'"
       DefinitionBody:
-        swagger: "2.0"
-        info:
-          description: "Minha Carteira API"
-          version: "1.0.0"
-          title: "Minha Carteira API"
-        paths:
-          /price:
-            post:
-              consumes:
-              - "application/json"
-              produces:
-              - "application/json"
-              parameters:
-              - in: "body"
-                name: "body"
-                required: true
-                schema:
-                  type: array
-                  items:
-                    type: string
-              responses:
-                "200":
-                  description: "Success"
-                  content:
-                    application/json:
-                      schema:
-                        type: array
-                        items:
-                          $ref: '#/schemas/StockResponse'
+        'Fn::Transform':
+          Name: 'AWS::Include'
+          Parameters:
+            Location: s3://minha-carteira-bucket/api/swagger.yaml
 
-                "400":
-                  description: "Bad Request"
-                  content:
-                    application/json:
-                      schema:
-                        $ref: '#/schemas/ErrorResponse'
-
-              x-amazon-apigateway-integration:
-                type: aws_proxy
-                httpMethod: POST
-                uri:
-                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StockPriceMultipleFunction.Arn}/invocations"
-
-              x-amazon-apigateway-policy:
-                Version: "2012-10-17"
-                Statement:
-                - Effect: "Allow"
-                  Principal: "*"
-                  Action: "execute-api:Invoke"
-                  Resource: "*"
-
-          /price/{stock}/now:
-            get:
-              produces:
-              - "application/json"
-              parameters:
-              - name: "stock"
-                in: "path"
-                required: true
-                type: string
-              responses:
-                "200":
-                  description: "Success"
-                  content:
-                    application/json:
-                      schema:
-                        $ref: '#/schemas/StockResponse'
-                "400":
-                  description: "Bad Request"
-                  content:
-                    application/json:
-                      schema:
-                        $ref: '#/schemas/ErrorResponse'
-              x-amazon-apigateway-integration:
-                type: aws_proxy
-                httpMethod: POST
-                uri:
-                  Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StockPriceNowFunction.Arn}/invocations"
-
-              x-amazon-apigateway-policy:
-                Version: "2012-10-17"
-                Statement:
-                - Effect: "Allow"
-                  Principal: "*"
-                  Action: "execute-api:Invoke"
-                  Resource: "*"
-        
-        schemas:
-          StockResponse:
-            type: object
-            required:
-              - stock
-              - price
-              - timestamp
-            properties:
-              stock:
-                type: string
-              price:
-                type: float
-              timestamp:
-                type: string
-
-          ErrorResponse:
-            type: object
-            required:
-              - message
-            properties:
-              message:
-                type: string
       Auth:
+        # DefaultAuthorizer: MyLambdaTokenAuthorizer
+        # Authorizers:
+        #   MyLambdaTokenAuthorizer:
+        #     FunctionArn: !GetAtt UserLoginFunction.Arn
         ResourcePolicy:
             CustomStatements:
               [
@@ -188,17 +86,17 @@ Resources:
       Runtime: python3.8
       Architectures:
         - x86_64
+      Layers:
+        - !Ref CommonFileLayers
+        - !Ref YahooFinanceLayer
       Events:
         MultipleStockCurrentPrice:
           Type: Api
           Properties:
-            Path: /price
+            Path: /price/now
             Method: post
             RestApiId:
               Ref: MinhaCarteiraApi
-      Layers:
-        - !Ref CommonFileLayers
-        - !Ref YahooFinanceLayer
 
   StockPriceNowFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
@@ -208,17 +106,65 @@ Resources:
       Runtime: python3.8
       Architectures:
         - x86_64
+      Layers:
+        - !Ref CommonFileLayers
+        - !Ref YahooFinanceLayer
       Events:
         StockCurrentPrice:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
-            Path: /price/{stock}/now
+            Path: /price/now/{stock}
             Method: get
             RestApiId:
               Ref: MinhaCarteiraApi
+
+  UserCrudFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: user-crud/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Architectures:
+        - x86_64
       Layers:
         - !Ref CommonFileLayers
-        - !Ref YahooFinanceLayer
+      Events:
+        GetAllUsers:
+          Type: Api
+          Properties:
+            Path: /user
+            Method: get
+            RestApiId:
+              Ref: MinhaCarteiraApi
+        CreateUser:
+          Type: Api
+          Properties:
+            Path: /user
+            Method: post
+            RestApiId:
+              Ref: MinhaCarteiraApi
+        GetUser:
+          Type: Api
+          Properties:
+            Path: /user/{id}
+            Method: get
+            RestApiId:
+              Ref: MinhaCarteiraApi
+        UpdateUser:
+          Type: Api
+          Properties:
+            Path: /user/{id}
+            Method: put
+            RestApiId:
+              Ref: MinhaCarteiraApi
+        DeleteUser:
+          Type: Api
+          Properties:
+            Path: /user/{id}
+            Method: delete
+            RestApiId:
+              Ref: MinhaCarteiraApi
+
 
 Outputs:
   # MinhaCarteiraApi is an implicit API created out of Events key under Serverless::Function

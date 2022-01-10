@@ -1,31 +1,20 @@
-import json
-
 from common.bovespa import Bovespa
 from common.logger import Logger
-from common.stock_response import (MultipleStockPriceResponse,
-                                   TooManyStocksResponse)
+from common.stock_response import StockNotFoundResponse, StockPriceResponse
 
 
 def lambda_handler(event, _):
 
-    logger = Logger('stock-price').instance()
+    logger = Logger('stock-price-now').instance()
     logger.debug(f'Received event: {event}')
 
-    request_stocks = json.loads(event['body'])
-    logger.info(f'Will predict stocks {request_stocks}')
+    paper = event['pathParameters']['stock'].upper()
 
-
-    if len(request_stocks) > 100:
-        return TooManyStocksResponse()
-
-    b3 = Bovespa()
-    if len(request_stocks) == 0:
-        stocks_price = []
-    elif len(request_stocks) == 1:
-        stocks_price = [b3.get_current_stock_price(request_stocks[0])]
-    else:
-        stocks_price = b3.get_current_multiple_stock_prices(request_stocks)
-
-    logger.info(stocks_price)
-
-    return MultipleStockPriceResponse(stocks_price).json()
+    try:
+        b3 = Bovespa()
+        price, paper = b3.get_current_stock_price(paper)
+        logger.info(f'Stock {paper} found with price {price}')
+        return StockPriceResponse(paper, price).json()
+    except IndexError:
+        logger.info(f'Stock {paper} not found')
+        return StockNotFoundResponse(paper).json()
