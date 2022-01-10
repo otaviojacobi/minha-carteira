@@ -1,14 +1,16 @@
 import json
 
+from common.exceptions import ResponseException
+
 
 # Decorators
-def capture_value_error(fn, status_code=400):
+def capture_value_error(fn):
     def inner(event, context):
         try:
             return fn(event, context)
-        except ValueError as e:
+        except ResponseException as e:
             return {
-                'statusCode': status_code,
-                'body': json.dumps({'message': str(e)})
+                'statusCode': e.status_code,
+                'body': json.dumps({'message': e.message})
             }
     return inner

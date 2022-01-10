@@ -90,7 +90,8 @@ disable=raw-checker-failed,
         missing-function-docstring,
         missing-module-docstring,
         logging-fstring-interpolation,
-        too-few-public-methods
+        too-few-public-methods,
+        raise-missing-from
 
 
 # Enable the message, report, category or checker with the given id(s). You can
@@ -367,7 +368,8 @@ good-names=i,
            Run,
            _,
            b3,
-           e
+           e,
+           fn
 
 # Good variable names regexes, separated by a comma. If names match any regex,
 # they will always be accepted

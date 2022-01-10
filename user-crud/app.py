@@ -15,9 +15,11 @@ def lambda_handler(event, _):
     http_method = event['httpMethod']
 
     if http_method == 'GET':
-        if event['resource'] == '/user':
-            return user_crud.get_all_users()
-        return user_crud.get_single_user(event['pathParameters']['id'])
+        user = user_crud.get_single_user(event['pathParameters']['id'])
+        return {
+            'statusCode': 200,
+            'body': json.dumps(user)
+        }
 
     if http_method == 'POST':
         user = user_crud.create_user(json.loads(event['body']))
@@ -30,4 +32,7 @@ def lambda_handler(event, _):
         return user_crud.update_user(event['pathParameters']['id'], json.loads(event['body']))
 
     if http_method == 'DELETE':
-        return user_crud.delete_user(event['pathParameters']['id'])
+        user_crud.delete_user(event['pathParameters']['id'])
+        return {
+            'statusCode': 204
+        }

@@ -129,13 +129,6 @@ Resources:
       Layers:
         - !Ref CommonFileLayers
       Events:
-        GetAllUsers:
-          Type: Api
-          Properties:
-            Path: /user
-            Method: get
-            RestApiId:
-              Ref: MinhaCarteiraApi
         CreateUser:
           Type: Api
           Properties:
@@ -164,7 +157,6 @@ Resources:
             Method: delete
             RestApiId:
               Ref: MinhaCarteiraApi
-
 
 Outputs:
   # MinhaCarteiraApi is an implicit API created out of Events key under Serverless::Function
