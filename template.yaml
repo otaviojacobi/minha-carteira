@@ -27,6 +27,23 @@ Globals:
         LOG_LEVEL: !Ref LogLevel
 
 Resources:
+
+# DB
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName : 'minha-carteira-user'
+      AttributeDefinitions: 
+        - AttributeName: id
+          AttributeType: S
+      KeySchema: 
+        - AttributeName: id
+          KeyType: HASH
+      ProvisionedThroughput: 
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+# API
   MinhaCarteiraApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -78,10 +95,10 @@ Resources:
       BuildMethod: python3.8              # Required to have AWS SAM build this layer
 
 # Functions
-  StockPriceMultipleFunction:
+  WalletNowFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: stock-price-multiple/
+      CodeUri: wallet-now/
       Handler: app.lambda_handler
       Runtime: python3.8
       Architectures:
@@ -90,31 +107,11 @@ Resources:
         - !Ref CommonFileLayers
         - !Ref YahooFinanceLayer
       Events:
-        MultipleStockCurrentPrice:
+        WalletNow:
           Type: Api
           Properties:
-            Path: /price/now
+            Path: /wallet/now
             Method: post
-            RestApiId:
-              Ref: MinhaCarteiraApi
-
-  StockPriceNowFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
-    Properties:
-      CodeUri: stock-price-now/
-      Handler: app.lambda_handler
-      Runtime: python3.8
-      Architectures:
-        - x86_64
-      Layers:
-        - !Ref CommonFileLayers
-        - !Ref YahooFinanceLayer
-      Events:
-        StockCurrentPrice:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
-          Properties:
-            Path: /price/now/{stock}
-            Method: get
             RestApiId:
               Ref: MinhaCarteiraApi
 
@@ -166,16 +163,17 @@ Outputs:
     Description: "API Gateway endpoint URL for Prod stage for Stock Price function"
     Value: !Sub "https://${MinhaCarteiraApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
 
-  StockPriceNowFunction:
-    Description: "Current stock price Lambda Function ARN"
-    Value: !GetAtt StockPriceNowFunction.Arn
-  StockPriceMultipleFunction:
-    Description: "Multiple stocks prices Lambda Function ARN"
-    Value: !GetAtt StockPriceMultipleFunction.Arn
 
-  StockPriceNowFunctionIamRole:
+  WalletNowFunction:
+    Description: "Get a Wallet current value Lambda Function ARN"
+    Value: !GetAtt WalletNowFunction.Arn
+  UserCrudFunction:
+    Description: "Get a Wallet current value Lambda Function ARN"
+    Value: !GetAtt UserCrudFunction.Arn
+
+  WalletNowFunctionIamRole:
     Description: "Implicit IAM Role created for Stock Price function"
-    Value: !GetAtt StockPriceNowFunctionRole.Arn
-  StockPriceMultipleFunctionIamRole:
+    Value: !GetAtt WalletNowFunctionRole.Arn
+  UserCrudFunctionIamRole:
     Description: "Implicit IAM Role created for Stock Price function"
-    Value: !GetAtt StockPriceMultipleFunctionRole.Arn
+    Value: !GetAtt UserCrudFunctionRole.Arn

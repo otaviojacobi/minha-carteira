@@ -22,5 +22,4 @@ class Bovespa:
             if not math.isnan(price):
                 price_papers.append((price, paper))
 
-
         return price_papers

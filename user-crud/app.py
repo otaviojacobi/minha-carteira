@@ -29,10 +29,20 @@ def lambda_handler(event, _):
         }
 
     if http_method == 'PUT':
-        return user_crud.update_user(event['pathParameters']['id'], json.loads(event['body']))
+        user = user_crud.update_user(event['pathParameters']['id'], json.loads(event['body']))
+        return {
+            'statusCode': 200,
+            'body': json.dumps(user)
+        }
+
 
     if http_method == 'DELETE':
         user_crud.delete_user(event['pathParameters']['id'])
         return {
             'statusCode': 204
         }
+
+    return {
+        'statusCode': 400,
+        'messsage': 'Invalid request'
+    }

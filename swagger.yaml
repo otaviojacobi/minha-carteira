@@ -15,9 +15,9 @@ x-amazon-apigateway-policy:
     Resource: "*"
 
 paths:
-  /price/now:
+  /wallet/now:
     post:
-      summary: Get single price of multiple stocks now
+      summary: Get the value of the wallet now
       consumes:
       - application/json
 
@@ -28,16 +28,23 @@ paths:
         schema:
           type: array
           items:
-            type: string
+            type: object
+            properties:
+              paper:
+                type: string
+              amount:
+                type: integer
       tags:
-        - Stocks
+        - Wallet
       responses:
         200:
           description: Success
           schema:
-            type: array
-            items:
-              $ref: '#/definitions/StockResponse'
+            type: object
+            properties:
+              value:
+                type: number
+              
         400:
           description: Bad Request
           schema:
@@ -47,32 +54,7 @@ paths:
         type: aws_proxy
         httpMethod: POST
         uri:
-          Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StockPriceMultipleFunction.Arn}/invocations'
-
-  /price/now/{stock}:
-    get:
-      summary: Get single stock price now
-      parameters:
-      - name: stock
-        in: path
-        required: true
-        type: string
-      tags:
-        - Stocks
-      responses:
-        200:
-          description: Success
-          schema:
-            $ref: '#/definitions/StockResponse'
-        400:
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/ErrorResponse'
-      x-amazon-apigateway-integration:
-        type: aws_proxy
-        httpMethod: POST
-        uri:
-          Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StockPriceNowFunction.Arn}/invocations'
+          Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WalletNowFunction.Arn}/invocations'
 
   /user:
     post:
@@ -111,10 +93,16 @@ paths:
       summary: Get a user
       description: Get a user.
       parameters:
-      - name: id
-        in: path
+      - in: path
+        name: id
         required: true
         type: string
+      - in: body
+        name: body
+        required: true
+        description: Update User
+        schema:
+          $ref: '#/definitions/User'
       tags:
         - User
       responses:
@@ -221,19 +209,7 @@ paths:
   #         Fn::Sub: 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserLoginFunction.Arn}/invocations'
 
 definitions:
-  StockResponse:
-    type: object
-    required:
-      - stock
-      - price
-      - timestamp
-    properties:
-      stock:
-        type: string
-      price:
-        type: number
-      timestamp:
-        type: string
+
 
   ErrorResponse:
     type: object
@@ -267,9 +243,3 @@ definitions:
         type: string
         description: A unique email for the user
 
-
-  LoginSucceededResponse:
-    properties:
-      token:
-        type: string
-        description: a login token
